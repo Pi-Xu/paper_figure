@@ -1,0 +1,17 @@
+# Local agent configuration
+/.agents/
+/.codex/
+
+# Local environments and credentials
+.venv/
+.env
+.env.*
+!.env.example
+
+# Python caches
+__pycache__/
+*.py[cod]
+
+# OS metadata
+.DS_Store
+Thumbs.db

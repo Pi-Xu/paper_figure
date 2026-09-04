@@ -1,0 +1,4 @@
+interface:
+  display_name: "Academic Figures"
+  short_description: "Plan, create, review, and integrate paper figures"
+  default_prompt: "Use $academic-figures to turn my research material into a paper figure, inspect it, and prepare its LaTeX integration."
