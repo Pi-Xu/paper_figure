@@ -5,16 +5,18 @@ description: Plan, generate, critique, refine, and integrate academic paper figu
 
 # Academic figures
 
-Turn research material into accurate, readable paper figures using Codex's file access, shell, image inspection, and native image generation. Use the tools available in the current session; no external MCP server, provider SDK, or API key is required by this workflow.
+Turn research material into accurate, readable paper figures using Codex's file access, shell, image inspection, native image generation, and subagents. Use the tools available in the current session; no external MCP server, provider SDK, or API key is required by this workflow.
 
-Inspired by [PaperBanana](https://arxiv.org/abs/2601.23265): use references, planning, styling, visualization, and critique as stages within one Codex workflow. Separate agents and a reference database are unnecessary.
+Inspired by [PaperBanana](https://arxiv.org/abs/2601.23265): use references, planning, styling, visualization, and critique as stages within one Codex workflow. Critique runs in a fresh reviewer subagent to counter the curse of knowledge: a figure must work for a first-time reader, and its author, who already knows what it is meant to say, cannot judge that. A reference database is unnecessary.
+
+If you were started as a figure reviewer, follow [references/review-protocol.md](references/review-protocol.md) alone.
 
 ## Select the requested work
 
 - **Plan:** propose the figure's message, content, layout, and rendering approach. Return the brief in chat unless a saved plan is requested; do not generate a figure yet.
-- **Generate:** establish a brief, render, inspect, refine as needed, and deliver the figure with its source or prompt.
-- **Critique:** inspect the supplied figure and available scientific context. Return prioritized findings and concrete fixes; do not edit files or regenerate the figure. Distinguish visible defects from scientific claims that cannot be verified without source material.
-- **Refine:** inspect the current figure and editable source, apply the requested changes, and check the result. Preserve scientific content and unrelated design choices.
+- **Generate:** establish a brief, render, improve the figure through the review loop, and deliver it with its source or prompt.
+- **Critique:** run one review round on the supplied figure, using the available scientific context for its brief. Return prioritized findings and concrete fixes; do not edit files or regenerate the figure. Distinguish visible defects from scientific claims that cannot be verified without source material.
+- **Refine:** inspect the current figure and editable source, apply the requested changes, and run the review loop on the result. Preserve scientific content and unrelated design choices.
 - **Integrate:** add the selected figure and caption to the requested LaTeX manuscript, or provide a snippet if no target manuscript is specified. Reuse an existing acceptable figure without regenerating it.
 
 Perform only the requested stages. For an end-to-end request, proceed through the workflow without introducing approval checkpoints. Ask only when a missing scientific fact, ambiguous target, or material preference blocks a correct result.
@@ -29,10 +31,13 @@ Default to moderate information density: give each figure one clear main message
 
 Write a concise brief covering:
 
-- The figure's main message and the evidence or method supporting it.
-- Panels, required labels and notation, and the exact relationships or quantities shown.
-- Reading order, visual hierarchy, intended information density, and meaningful color/grouping choices.
-- Target width, aspect ratio, fonts, and selected renderer.
+- The figure's main message, phrased as the one-sentence takeaway a first-time reader should get, and the evidence or method supporting it.
+- The target reader, as the user describes them or as inferred from the venue and manuscript: their field, and the notation, terms, and visual conventions they can be assumed to know, listed explicitly. Anything unlisted, including terms the paper itself introduces, counts as unknown to them.
+- Panels, required labels with their exact text, notation, and the exact relationships or quantities shown.
+- The entry point the reader should look at first, reading order, visual hierarchy, intended information density, and meaningful color/grouping choices.
+- Target width, aspect ratio, fonts, selected renderer, and a draft caption.
+
+Save the brief as `brief.md` in the figure directory before the first review round. The reviewer checks the figure against it, so it holds only what the figure must communicate; image prompts, provenance, and working notes go in `notes.md`. Fix the target-reader list before the first round and change it only when the user corrects it, so a failed review cannot be explained away afterwards.
 
 Inspect the paper's body-text and mathematical fonts before choosing figure typography. Prefer fonts that coordinate with the manuscript and remain clear at the target size; no single font is required for all academic figures. Use bold sparingly and avoid oversized titles, all-caps group headings, and excessive weight changes. Carry compatible style choices across figures in the same project.
 
@@ -72,7 +77,7 @@ Use code for empirical charts and precision-dependent mathematical or structural
 
 If native generation is unavailable or fails, report that limitation. Continue independent planning or critique and offer a suitable code-based alternative; do not substitute a sketch for explicitly requested artwork without agreement.
 
-## Inspect and refine
+## Inspect each render
 
 Render and view the actual output: inspect the PNG preview and, when delivering PDF, a separate preview rasterized from the final PDF. Preview SVG exports through rasterization as well; source inspection alone is insufficient. Check the overall figure at its intended publication width and enlarge mathematical symbols, formula backgrounds, and arrows for detail. If the tools cannot render or display it, distinguish source inspection from visual verification and report the unchecked part.
 
@@ -84,15 +89,65 @@ Check these dimensions against the brief and source material:
 - **Export quality:** clipping (including formulas), substituted fonts, missing or inconsistent glyphs, misplaced subscripts/superscripts, unintended formula backgrounds, changed arrowheads, margins, contrast, and raster resolution at the intended size. Verify the fonts actually used by the renderer/exporter through resolved-font or exported-font information as applicable and visual inspection; SVG font-family declarations alone do not establish correct font use.
 - **Accessibility:** inspect a grayscale preview; methods and groups must remain identifiable through labels and structure, with line styles or markers where needed.
 
-Prioritize scientific errors, then readability, then cosmetic polish. Make targeted corrections and re-render affected outputs. By default, use at most two refinement rounds after the first rendering and stop earlier if no material issues remain. User-requested additional iterations override this default. If issues remain at the limit, deliver the best current draft with explicit unresolved findings rather than claiming it is ready for publication.
+Prioritize scientific errors, then readability, then cosmetic polish. Before each review round, make one correction pass for the defects you find and re-render affected outputs, so the reviewer's attention goes to what you cannot judge yourself: how the figure reads to someone who has not seen the brief. If issues remain when the review loop ends, deliver the best reviewed draft with explicit unresolved findings rather than claiming it is ready for publication.
+
+## Review loop
+
+A fresh reviewer subagent judges each version, you audit how it reached its reading, and then you triage its findings and revise. Start a new reviewer every round and hand it only file paths: a reviewer that has seen an earlier version, the brief, or this conversation is no longer a first-time reader, and its first answer must be a cold read of the figure alone. Number rounds `r1`, `r2`, … per figure, continuing across requests.
+
+### Run a round
+
+1. Save the version as `<name>-vN.<ext>` beside earlier versions. Make `review/vN-print.png`, a copy downscaled to the final printed width at about 150 pixels per inch (3.35 in ≈ 500 px; 6.5 in ≈ 975 px), rasterized from the final PDF for vector outputs. Add `review/vN-gray.png` when color carries meaning.
+2. Start the reviewer with Codex's native subagent tool (for example `spawn_agent`) as a fresh agent whose context holds only this message; leave any option to fork or share your conversation off:
+
+   > You are an independent reviewer of a figure for an academic paper. Read `<absolute path of references/review-protocol.md>` and do Phase A. Figure: `<absolute path of review/vN-print.png>`.
+
+   Save the reply verbatim as Phase A of `review/rN.md`.
+3. Send the same reviewer a second message (for example with `send_input`), leaving out items that do not exist yet:
+
+   > Do Phase B for round N. Brief: `<path>`. Full-resolution figure: `<path>`. Grayscale: `<path>`. Previous version: `<path>`. Previous review with audit and author response: `<path of review/r(N-1).md>`.
+
+   Save the reply verbatim as Phase B of `review/rN.md`, then close the reviewer. If you cannot message the same reviewer again, start a second fresh reviewer for Phase B and paste the saved Phase A into its message.
+
+These two messages are the whole hand-off. Your prompts, notes, summaries of the figure, suspicions, and account of what changed stay with you; the reviewer judges the files directly.
+
+If subagents are unavailable or cannot view images, run each phase as a separate read-only `codex exec` process with that phase's images attached (see `codex exec --help`; it needs network access, so request approval if the sandbox blocks it), and pass the saved Phase A to the Phase B process. If neither route works, do the round yourself with the same protocol, writing Phase A from the print-size preview before rereading the brief, and label the round `self-review, not independent` in `review/rN.md` and in the final report.
+
+For Critique, run one round on the supplied figure without revising it. Write the brief from the manuscript and the user's account of the figure's purpose, marking unknown intent as unknown; keep the brief, previews, and review in a temporary directory unless a report was requested; and return the reviewer's findings together with the reasoning audit below.
+
+### Audit the reasoning
+
+The reviewer knows far more than most readers and cannot un-know it, so its reading can succeed on expertise or guesswork where the figure itself fails. Phase A therefore ends with an inference trace giving, for each interpretation, the visible evidence and the knowledge it used. Audit every row against the print-size preview and the target-reader list in `brief.md`:
+
+- **Evidence:** the cited element exists, is legible at print size, and reads as quoted.
+- **Knowledge:** every convention or fact the row uses is on the target-reader list or defined in the draft caption. Count anything else as unknown to readers, however obvious it seems to you.
+- **Inference:** the interpretation follows from that evidence and knowledge; a row whose basis is a guess fails.
+
+Each failed row is a point the figure does not carry for its readers. Add it as a finding with ID `rN-aK`, graded by the severity rules in [references/review-protocol.md](references/review-protocol.md), with a fix that shows or labels the point in the figure or defines it in the caption. If the main message rests on a failed row, a MATCH becomes PARTIAL and the verdict becomes REVISE. The audit can only add findings and lower the verdict, never raise it. Record it as a table in `review/rN.md` between Phase B and the author response.
+
+### Respond and revise
+
+Triage every finding in an "Author response" table at the end of `review/rN.md`: accepted, with the change made, or declined, with a reason grounded in the brief, the scientific content, or the user's instructions. Decline any fix that would change scientific content, terminology, or claim strength, and solve the underlying readability problem another way. User feedback outranks the reviewer; record it in the same table. A round is complete when `review/rN.md` holds both phases verbatim, the reasoning audit, and a response to every finding.
+
+Change only what accepted findings require, so the parts that work survive. For generated artwork, make local fixes, such as a label, an arrow, or a color, by editing the current version as the edit target and naming what must stay unchanged; regenerate from the updated full prompt only for layout, hierarchy, or reading-order problems. Record each version's exact prompt and method in `notes.md`. For code-rendered figures, change the source and re-export.
+
+### Stop
+
+- Stop when the verdict, after the reasoning audit, is ACCEPT.
+- Run at most three rounds by default, which allows two revisions; a user-specified count overrides this. Deliver only reviewed versions.
+- When the same blocker survives two consecutive rounds, change strategy rather than retrying the prompt: simplify the element, switch between editing and regenerating, or propose the code route. Ask the user if none fits.
+- Deliver the best reviewed version: when a reviewer judges the newest version WORSE than the previous one, deliver the previous one. Report the blocker and major findings still open as unresolved.
+- Run rounds without pausing unless the user asks to give feedback each round; then, after each review, show the verdict, the findings, and your planned response, and wait.
 
 ## Save and integrate
 
 Follow the project's figure directories and naming. Otherwise use `figures/<figure-name>/`. Keep these artifacts together for generation work:
 
 - Editable source or exact image-generation prompt, plus references to the input data/material.
-- Selected final figure and a PNG preview for vector outputs. The final PNG also serves as the preview for artwork.
-- One compact `notes.md` containing the brief, provenance, reproduction command or prompt, review findings, and unresolved issues.
+- `brief.md`, the contract each reviewer checks against.
+- Every reviewed version, the selected final figure, and a PNG preview for vector outputs. The final PNG also serves as the preview for artwork.
+- `review/`, holding the print-size previews and one `rN.md` per round.
+- One compact `notes.md` containing provenance, each version's exact prompt and revision method, the reproduction command, a one-line outcome per review round, and unresolved issues.
 
 Do not copy large datasets unnecessarily. Use project-relative paths where practical. For refinement, preserve the original and use a sibling version such as `method-v2.svg` unless replacement was requested; keep its corresponding exports aligned. For critique-only work, keep findings in chat unless a report was requested.
 
@@ -112,13 +167,14 @@ For a simple single-column figure, adapt this example:
 
 Use `figure*` only when a two-column manuscript calls for a figure spanning both columns. If no manuscript target is specified, supply an adapted snippet with the deliverables. With an integration target, edit it and run the project's LaTeX build when available; inspect the resulting figure page. Report unavailable compilation or unrelated build failures accurately.
 
-Finish with links to the selected figure and source/prompt, the LaTeX snippet or updated manuscript when applicable, a brief account of checks performed, and any material unresolved issues. Distinguish standalone figure previews from checks of the figure in the compiled manuscript, explicitly stating when manuscript integration was not inspected. Do not claim reproducibility or visual validation beyond what was actually checked.
+Finish with links to the selected figure and source/prompt, the LaTeX snippet or updated manuscript when applicable, a brief account of checks performed, one line per review round (glance verdict after the reasoning audit, open blocker and major findings, what changed), and any material unresolved issues. Mark any round that was not independent. Distinguish standalone figure previews from checks of the figure in the compiled manuscript, explicitly stating when manuscript integration was not inspected. Do not claim reproducibility or visual validation beyond what was actually checked.
 
 ## Example requests
 
 - “Use $academic-figures to plan a methodology figure from methods.tex.”
 - “Use $academic-figures to plot results.csv with the paper's existing uncertainty definition.”
 - “Use $academic-figures to critique figures/model.png against the methods section.”
+- “Use $academic-figures to generate the overview figure from methods.tex with up to two review rounds, pausing after each review for my feedback.”
 - “Use $academic-figures to simplify this diagram while preserving every edge and label.”
 - “Use $academic-figures to generate a conceptual illustration of a porous membrane separating large and small particles.”
 - “Use $academic-figures to integrate figures/method/method.pdf into paper.tex.”

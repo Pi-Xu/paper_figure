@@ -4,7 +4,7 @@ English | [简体中文](README.zh-CN.md)
 
 A Codex skill for turning manuscript content, research data, and existing figures into clear academic visuals. Use it to plan figures, create data plots and scientific illustrations, refine methodology diagrams, or integrate figures into a LaTeX paper.
 
-Give it your research material and the task you want completed. It chooses a suitable rendering approach, preserves the scientific meaning, and checks the exported result.
+Give it your research material and the task you want completed. It chooses a suitable rendering approach, preserves the scientific meaning, checks the exported result, and has each version reviewed by an independent first-time reader.
 
 ## Quick start
 
@@ -30,9 +30,9 @@ To try it without installing, ask Codex to read the repository's `academic-figur
 You can request just one stage:
 
 - **Plan:** propose the content and layout without generating a figure.
-- **Generate:** create, inspect, and refine a figure from the supplied material.
-- **Critique:** review an existing figure without editing it.
-- **Refine:** change an existing figure while preserving its scientific content.
+- **Generate:** create a figure from the supplied material and improve it through review rounds.
+- **Critique:** run one independent review round on an existing figure without editing it.
+- **Refine:** change an existing figure while preserving its scientific content, then review the result.
 - **Integrate:** add a selected figure and caption to a specified LaTeX manuscript.
 
 ## How it chooses what to draw
@@ -61,9 +61,29 @@ $academic-figures Create one overview figure for methods.tex. Use the attached f
 
 Without a reference, it follows the manuscript's typography and dimensions, using restrained colors and readable labels. No single font, illustration style, or fixed layout is required.
 
+## How figures are reviewed
+
+The person who draws a figure knows what it is meant to say, so they cannot easily tell whether a newcomer gets it at a glance: the curse of knowledge. The skill therefore has every version reviewed by a fresh Codex subagent that has not seen the brief, the image prompt, or the conversation. The reviewer has the same problem in another form: it knows more than most readers and can decode what they could not. So it must show how it reached each conclusion, and Codex checks that reasoning against what the target readers can be assumed to know. Each round has four steps:
+
+1. **Cold read.** The reviewer sees only the figure, downscaled to its printed size, and reports the main message it takes away, where its eye lands first, the order in which it reads the figure, and anything it cannot read. For each interpretation, it lists the visible elements it relied on and the conventions or background knowledge it brought in.
+2. **Informed review.** Only then does it read the brief and compare what it took away with what you intended. It returns at most five findings, ranked blocker, major, or minor, each with a location and a concrete fix, and a verdict of ACCEPT or REVISE.
+3. **Reasoning audit.** Codex checks each interpretation against the brief's list of what the target readers know. One that rests on knowledge outside that list, on a guess, or on text that is illegible at print size marks a point the figure fails to communicate, even when the reviewer got it right. The audit can only add findings and tighten the verdict.
+4. **Response and revision.** Codex accepts or declines each finding with a reason, never at the expense of scientific accuracy, and revises the figure: it edits the current image for local fixes and regenerates it for layout problems.
+
+Each new version gets a new reviewer, so every round is a genuine first reading. The loop ends when the reviewer accepts or after three rounds by default. If the same blocker survives two rounds in a row, Codex changes its approach or asks you instead of retrying the same prompt. You receive the best reviewed version and the record of every round.
+
+You can adjust the loop in your request:
+
+- "Run up to five review rounds."
+- "Pause after each review so I can add feedback." Your feedback takes precedence over the reviewer's.
+- "Critique figures/model.png." This runs one review round without redrawing.
+- "The readers are psychology researchers who know regression but not structural equation models." This sets the knowledge the reasoning audit allows; otherwise Codex infers it from the venue and manuscript.
+
+Subagents depend on Codex's `multi_agent` feature; `codex features list` shows whether it is enabled. Without subagents, the skill runs the reviewer as a separate `codex exec` process. If neither route works, it reviews the figure itself and labels that review as not independent.
+
 ## What you receive
 
-For generation work, the skill keeps the figure together with its editable source or exact image-generation prompt, relevant input references, and concise review notes. Vector workflows include a PDF export and PNG preview; generated artwork is retained as PNG.
+For generation work, the skill keeps every version of the figure together with its editable source or exact image-generation prompt, relevant input references, the brief the reviewers checked against (`brief.md`), the record of each review round (`review/`), and concise notes. Vector workflows include a PDF export and PNG preview; generated artwork is retained as PNG.
 
 Checks cover scientific fidelity, final-size readability, mathematical notation, grayscale clarity, and export defects. PDF delivery includes inspection of a preview rasterized from the final PDF. Manuscript integration is checked separately when requested and reported as unchecked if it was not inspected.
 
@@ -72,6 +92,7 @@ Plan-only and critique-only requests return findings in chat by default.
 ## Skill files
 
 - [academic-figures/SKILL.md](academic-figures/SKILL.md): workflow and quality requirements.
+- [academic-figures/references/review-protocol.md](academic-figures/references/review-protocol.md): instructions for the independent reviewer subagent.
 - [academic-figures/agents/openai.yaml](academic-figures/agents/openai.yaml): display metadata and default invocation prompt.
 
-Both files are written in English. Image-generation prompts are composed for each task; their language is not currently fixed by the skill. This README and its Chinese translation describe the same workflow.
+These files are written in English. Image-generation prompts are composed for each task; their language is not currently fixed by the skill. This README and its Chinese translation describe the same workflow.
